@@ -4,12 +4,12 @@ import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import multi_dot
 
-import cholesteric
-import mueller
-import pyllama
-import dielectric_tensor as dt
+from src.berremueller import cholesteric
+from src.berremueller import  mueller
+from src.berremueller import pyllama
+from src.berremueller import dielectric_tensor as dt
 import warnings
-import pandas as pd
+
 
 '''Handling of Jones vectors and Mueller matrices, particularly those coming from
 numeric calculations
