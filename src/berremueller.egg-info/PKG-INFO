@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: berremueller
-Version: 1.0.0
+Version: 1.0.2
 Summary: A library for implementing the Berreman 4X4 matrix method alongside Mueller matrices
 Author-email: Andrew Salij <andrewsalij@gmail.com>
 Description-Content-Type: text/markdown

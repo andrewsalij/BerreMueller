@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import factorial
 from scipy.signal import find_peaks
 import scipy.spatial as scp_spa
-from src.berremueller import python_util as pu
+from berremueller import python_util as pu
 from scipy.spatial.transform import Rotation
 from warnings import warn
 

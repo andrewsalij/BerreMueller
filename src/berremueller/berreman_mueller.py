@@ -4,10 +4,10 @@ import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import multi_dot
 
-from src.berremueller import cholesteric
-from src.berremueller import  mueller
-from src.berremueller import pyllama
-from src.berremueller import dielectric_tensor as dt
+from berremueller import cholesteric
+from berremueller import  mueller
+from berremueller import pyllama
+from berremueller import dielectric_tensor as dt
 import warnings
 
 

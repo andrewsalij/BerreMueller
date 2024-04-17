@@ -6,8 +6,8 @@ import warnings
 import time  # to calculate the time elapsed for a spectrum
 import pickle  # to save as Pickle file
 import scipy.io  # to save as Matlab file
-from src.berremueller import cholesteric
-from src.berremueller import full_berreman
+from berremueller import cholesteric
+from berremueller import full_berreman
 
 
 '''
