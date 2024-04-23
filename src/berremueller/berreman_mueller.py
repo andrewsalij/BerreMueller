@@ -3,13 +3,12 @@ import copy
 import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import multi_dot
-
 from berremueller import cholesteric
 from berremueller import  mueller
 from berremueller import pyllama
 from berremueller import dielectric_tensor as dt
 import warnings
-
+import pandas as pd
 
 '''Handling of Jones vectors and Mueller matrices, particularly those coming from
 numeric calculations
@@ -21,6 +20,7 @@ calcs
 
 Convention: (1,1j) is LHP, keeping pyllama's convention (most of the rest of the codebase reverts this)
 '''
+
 
 def get_intensity_from_jones_vector(jones_vector):
     '''Jones vector converstion to intensity. Polarization axis must be 0'''
@@ -100,9 +100,9 @@ def reflection_transmission_set(reflection_matrix,transmission_matrix,kz_in=  1,
     refl_all = np.zeros((3,np.size(reflection_matrix,axis = -1)))
     for i in np.arange(np.size(input_all,axis =0)):
         if (style == "amplitude"):
-            refl_all[i,:], trans_all[i,:] = reflection_transmission_from_amplitude_matrices(reflection_matrix,transmission_matrix,input_all[i,:],kz_in = kz_in,kz_out = kz_out)
+            refl_all[i,:], trans_all[i,:] = reflection_transmission_from_amplitude_matrices(reflection_matrix,transmission_matrix,input_all[i,:])
         elif (style == "intensity"):
-            refl_all[i, :], trans_all[i, :] = reflection_transmission_from_intensity_matrices(reflection_matrix,transmission_matrix,input_all[i, :],kz_in = kz_in,kz_out = kz_out)
+            refl_all[i, :], trans_all[i, :] = reflection_transmission_from_intensity_matrices(reflection_matrix,transmission_matrix,input_all[i, :])
         else:
             raise ValueError("Invalid style")
     return refl_all, trans_all
@@ -121,7 +121,7 @@ def reflection_transmission_from_intensity_matrices(reflection_matrix,transmissi
 
 def kron_vectorized(a,b):
     '''
-    kronecker product implmented to take advantage of numpy
+    kronecker product implmented so as to take advantage of numpy
     vectorization when calculating a stack of products
     Much faster than a for loop caclulating each stack
     :param a: np.ndarray (shape (N,N,X))
@@ -454,7 +454,8 @@ def strained_dielectric_isotropic(eps_constant,stress_tensor,elastic_material):
     :param elastic_material: dt.Elastic_Material
     :return:
     '''
-    strain_tensor = dt.strain_tensor_hookes_law_isotropic_from_stress(stress_tensor,elastic_material.get_stiffness_matrix())
+    strain_tensor = dt.strain_tensor_hookes_law_isotropic_from_stress(stress_tensor,
+                                                                     elastic_material.get_stiffness_matrix())
     electrostriction_params = dt.get_electrostriction_parameters(eps_constant,material_type="isotropic")
     eps_tensor = dt.strain_dielectric_tensor(eps_constant, strain_tensor, electrostriction_params)
     return eps_tensor
@@ -495,6 +496,7 @@ def general_berreman_angle_sweep(eps_total_list,thick_total_list,wl_nm_list,spec
         cur_r,cur_t = get_refl_trans_matrix_spectra(cur_spectrum,coef_type=type,circ=  circ,talk= talk,method = "SM")
         r_matrix_set[:,:,:,i],t_matrix_set[:,:,:,i] = cur_r, cur_t
     return r_matrix_set,t_matrix_set
+
 def rotate_rank2_tensor_stack(rotation_matrix,tensor):
     '''
     :param rotation_matrix:
@@ -627,7 +629,7 @@ def angular_charactetrization_both_sides(material_stack_object,azimuthal_set,pol
             cur_azimuthal_angle = azimuthal_set[i]
             for j in range(np.size(polar_angle_set)):
                 cur_polar_angle = polar_angle_set[j]
-                rotation_matrix = pyllama.euler_rotation_matrix(0,0,cur_polar_angle)
+                rotation_matrix = dt.euler_rotation_matrix(0,0,cur_polar_angle)
                 rotated_material_stack = material_stack_object.get_rotated_object(rotation_matrix)
                 if (model_type == "CholestericModel"):
                     other_args.update({'chole':chole,'eps':rotated_material_stack.eps_list[0],
@@ -670,7 +672,17 @@ class DBR_Results():
 
 
 
-def characterize_solo_sample_ps(dielectric_tensor,wl_nm_array,spec,thickness_nm,theta_in_rad = 0,talk = "True"):
+def characterize_solo_sample_ps(dielectric_tensor,wl_nm_array,spec,thickness_nm,theta_in_rad = 0,talk = "True",method="SM"):
+    '''
+    :param dielectric_tensor:
+    :param wl_nm_array:
+    :param spec:
+        spectrum (in eV) of sample
+    :param thickness_nm:
+    :param theta_in_rad:
+    :param talk:
+    :return:
+    '''
     eps_tensor_set = dielectric_tensor
     eps_tensor = dielectric_tensor[:, :, 0]
     wl_eps_set = dt.nm_to_eV(spec)
@@ -686,7 +698,7 @@ def characterize_solo_sample_ps(dielectric_tensor,wl_nm_array,spec,thickness_nm,
                                      theta_in_rad=theta_in_rad,
                                      rotangle_rad=0,
                                      rotaxis="z"))
-    spectrum.calculate_refl_trans_coefs(circ=False, method="SM", talk=talk)
+    spectrum.calculate_refl_trans_coefs(circ=False, method=method, talk=talk)
     r, t = spectrum.export_r_t_matrices(type="amplitude", matrix_type='ps')
     return r,t
 
