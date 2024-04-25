@@ -26,7 +26,7 @@ def kron_vectorized(matrix_a,matrix_b):
 def commute_matrix_stacks(matrix_a,matrix_b):
     '''
     Returns commutator of a matrix with a same shape stack of matrices
-    Designed for matrix to be magnus term after integration and stakc to be S term
+    Designed for matrix to be magnus term after integration to be S term
     :param matrix: np.ndarray (N,N) or (N,N,t)
     :param matrix_stack: np.ndarray (N,N) or (N,N,t)
     :return: np.ndarray (N,N,t)
@@ -182,7 +182,7 @@ def create_G_matrix_stack():
     g_0 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
     g_1 = np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1j],[0,0,-1j,0]])
     g_2 = np.array([[0,0,1,0],[0,0,0,-1j],[1,0,0,0],[0,1j,0,0]])
-    g_3 = np.array([0,0,0,1],[0,0,1j,0],[0,-1j,0,0],[1,0,0,0])
+    g_3 = np.array([[0,0,0,1],[0,0,1j,0],[0,-1j,0,0],[1,0,0,0]])
     return np.dstack((g_0,g_1,g_2,g_3))
 #b_vec and d_vec in terms of (mean,linear, linear prime, circular)
 #let b_vec and d_vec 0 components be 0 to only get polarization-dependent behavior
@@ -525,8 +525,8 @@ def mueller_from_coherency_matrix(coherency_matrix):
     #TODO: write this in a faster way
     for i in range(4):#there has to be a more efficient way of doing this
         for j in range(4):
-            mueller_matrix[i,j] = np.trace((np.dot(np.conjugate(g_stack[:,:,i],
-                                                                np.dot(g_stack[:,:,j],coherency_matrix)))))
+            mueller_matrix[i,j] = np.trace(np.dot(np.conjugate(g_stack[:,:,i]),
+                                                                np.dot(g_stack[:,:,j],coherency_matrix)))
     assert np.isclose(mueller_matrix[0,0],np.trace(coherency_matrix)), "M_00 must be equal to trace of coherency matrix"
     return mueller_matrix
 def cloude_decompose_matrix_stack(mueller_matrix_stack):
@@ -539,12 +539,13 @@ def cloude_decompose_matrix_stack(mueller_matrix_stack):
     '''
     matrix_shape = np.shape(mueller_matrix_stack)
     assert matrix_shape[0] == 4 and matrix_shape[1] == 4, "Axes 0 and 1 must be (4,4)"
-    pauli_stack = create_pauli_stack(convention_order="xyz")
+    pauli_stack = create_pauli_stack(convention_order="optics")
     covariance_matrix = np.zeros(matrix_shape,dtype=mueller_matrix_stack.dtype)
     for i in range(4):
         for j in range(4):
             covariance_term = 1/4*np.kron(pauli_stack[:,:,i],np.conjugate(pauli_stack[:,:,j]))
-            covariance_matrix = covariance_matrix+mueller_matrix_stack[i,j,:]*covariance_term
+            covariance_matrix = covariance_matrix+np.einsum("a,ij->ija",mueller_matrix_stack[i,j,:],covariance_term)
+    assert np.allclose(mueller_matrix_stack[0,0,:]+mueller_matrix_stack[0,1,:]+mueller_matrix_stack[1,0,:]+mueller_matrix_stack[1,1,:],4*covariance_matrix[0,0,:]), "upper corner of covariance matrix invalid"
     assert np.isclose(np.trace(covariance_matrix[:,:,0]),mueller_matrix_stack[0,0,0]), "Covariance matrix trace must equal M_00"
     l_matrix = 1/np.sqrt(2) * \
             np.array([[1, 0, 0, 1],
