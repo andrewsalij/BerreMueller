@@ -119,18 +119,8 @@ def reflection_transmission_from_intensity_matrices(reflection_matrix,transmissi
     t_intensity = t_vec[0,...]+t_vec[1,...]
     return r_intensity, t_intensity
 
-def kron_vectorized(a,b):
-    '''
-    kronecker product implmented so as to take advantage of numpy
-    vectorization when calculating a stack of products
-    Much faster than a for loop caclulating each stack
-    :param a: np.ndarray (shape (N,N,X))
-    :param b:  np.ndarray (shape (N,N,X))
-    :return:
-    '''
-    i,j,x = a.shape
-    k,l,y = b.shape
-    return np.einsum('ijx,klx->ikjlx',a,b).reshape(i*j,k*l,x)
+def kron_vectorized(matrix_a,matrix_b):
+    mueller.kron_vectorized(matrix_a,matrix_b)
 
 def stokes_from_jones_vector(jones_vector):
     '''

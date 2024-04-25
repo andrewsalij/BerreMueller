@@ -11,6 +11,18 @@ import warnings
 
 Andrew Salij'''
 
+def kron_vectorized(matrix_a,matrix_b):
+    '''
+    kronecker product implemented to take advantage of numpy
+    vectorization when calculating a stack of products
+    Much faster than a for loop caclulating each stack
+    :param a: np.ndarray (shape (N,N,X))
+    :param b:  np.ndarray (shape (N,N,X))
+    :return:
+    '''
+    i,j,x = matrix_a.shape
+    k,l,y = matrix_b.shape
+    return np.einsum('ijx,klx->ikjlx',matrix_a,matrix_b).reshape(i*j,k*l,x)
 def commute_matrix_stacks(matrix_a,matrix_b):
     '''
     Returns commutator of a matrix with a same shape stack of matrices
@@ -142,14 +154,36 @@ def diff_mueller_params(mean_abs,biref_vec,dichroism_vec):
                                 [dichroism_vec[2],-biref_vec[1],biref_vec[0],mean_abs]])
     return diff_matrix
 
-def create_pauli_stack():
-    '''Provides stack of Pauli matrices'''
+def create_pauli_stack(convention_order = "optics"):
+    '''Provides stack of Pauli matrices
+    :param convention_order: str
+       "optics": [0, z, x, y]
+            used in optics literature such as https://doi.org/10.1117/12.202080
+       "xyz": [0, x, y, z]
+            more standard convention for quantum physics
+    return np.ndarray (2,2,4)
+    '''
     sigma_0 = np.array([[1,0],[0,1]])
     sigma_1 = np.array([[1,0],[0,-1]])
     sigma_2 = np.array([[0,1],[1,0]])
     sigma_3 = np.array([[0,-1j],[1j,0]])
-    return np.dstack((sigma_0,sigma_1,sigma_2,sigma_3))
+    if (convention_order == "optics"):
+        full_stack = np.dstack((sigma_0,sigma_1,sigma_2,sigma_3))
+    elif (convention_order == "xyz"):
+        full_stack = np.dstack((sigma_0,sigma_2,sigma_3,sigma_1))
+    else: raise ValueError("Invalid convention_order")
+    return full_stack
 
+def create_G_matrix_stack():
+    '''
+    Provides the stack of G matrices ((5.3) in Gil and Ossikovski, Polarized Light and the Mueller Matrix Approach)
+    :return:
+    '''
+    g_0 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+    g_1 = np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1j],[0,0,-1j,0]])
+    g_2 = np.array([[0,0,1,0],[0,0,0,-1j],[1,0,0,0],[0,1j,0,0]])
+    g_3 = np.array([0,0,0,1],[0,0,1j,0],[0,-1j,0,0],[1,0,0,0])
+    return np.dstack((g_0,g_1,g_2,g_3))
 #b_vec and d_vec in terms of (mean,linear, linear prime, circular)
 #let b_vec and d_vec 0 components be 0 to only get polarization-dependent behavior
 class JONES_MATRIX():
@@ -478,6 +512,61 @@ def parallel_decompose_matrix_stack(mueller_matrix_stack):
     m_s = 0.5*(m+np.transpose(m,(1,0,2)))
     m_a = 0.5*(m-np.transpose(m,(1,0,2)))
     return np.stack((m_a,m_s),axis =-1)
+
+def mueller_from_coherency_matrix(coherency_matrix):
+    '''
+    Directly gives the analytic expression for the Mueller matrix in terms of the coherency matrix
+    5.14 in Gil and Ossikovski
+    :param coherency_matrix: np.ndarray (4,4)
+    :return:
+    '''
+    g_stack = create_G_matrix_stack()
+    mueller_matrix = np.zeros((4,4),dtype = coherency_matrix.dtype)
+    #TODO: write this in a faster way
+    for i in range(4):#there has to be a more efficient way of doing this
+        for j in range(4):
+            mueller_matrix[i,j] = np.trace((np.dot(np.conjugate(g_stack[:,:,i],
+                                                                np.dot(g_stack[:,:,j],coherency_matrix)))))
+    assert np.isclose(mueller_matrix[0,0],np.trace(coherency_matrix)), "M_00 must be equal to trace of coherency matrix"
+    return mueller_matrix
+def cloude_decompose_matrix_stack(mueller_matrix_stack):
+    '''
+    Decomposes a stack of matrices (4,4,X) into non depolarizing and depolarizing parts
+    See (17)-(19) in https://doi.org/10.1364/OL.37.000220
+    see Section 5.3 in Gil and Ossikovski, Polarized Light and the Mueller Matrix Approach, 2nd ed. 
+    :param mueller_matrix_stack:
+    :return: np.ndarray (4,4,X)
+    '''
+    matrix_shape = np.shape(mueller_matrix_stack)
+    assert matrix_shape[0] == 4 and matrix_shape[1] == 4, "Axes 0 and 1 must be (4,4)"
+    pauli_stack = create_pauli_stack(convention_order="xyz")
+    covariance_matrix = np.zeros(matrix_shape,dtype=mueller_matrix_stack.dtype)
+    for i in range(4):
+        for j in range(4):
+            covariance_term = 1/4*np.kron(pauli_stack[:,:,i],np.conjugate(pauli_stack[:,:,j]))
+            covariance_matrix = covariance_matrix+mueller_matrix_stack[i,j,:]*covariance_term
+    assert np.isclose(np.trace(covariance_matrix[:,:,0]),mueller_matrix_stack[0,0,0]), "Covariance matrix trace must equal M_00"
+    l_matrix = 1/np.sqrt(2) * \
+            np.array([[1, 0, 0, 1],
+                      [1, 0, 0, -1],
+                      [0, 1, 1, 0],
+                      [0, 1j, -1j, 0]])
+    coherency_matrix = np.einsum("ij,jkl->ikl",l_matrix, #5.13 in Gil and Ossikovski, C(M) in their notation
+                                  np.einsum("ijl,jk->ikl",covariance_matrix,np.conjugate(np.transpose(l_matrix))))
+    coherency_decomposition_matrix =  np.zeros((4,4,4,matrix_shape[2]),dtype=mueller_matrix_stack.dtype)
+    for x in range(matrix_shape[2]):
+        c_vals, c_vecs = np.linalg.eig(coherency_matrix[:,:,x])
+        idx = (-1*c_vals).argsort()
+        c_vals = c_vals[idx]
+        c_vecs = c_vecs[:,idx] #sorted greatest to least
+        for i in range(4):
+            projection_matrix = np.outer(c_vecs[:,i],np.conj(c_vecs[:,i]))
+            coherency_decomposition_matrix[:,:,i,x] = c_vals[i]*projection_matrix #sorted greatest to least
+    mueller_decomposition_matrix = np.zeros((4,4,4,matrix_shape[2]),dtype=mueller_matrix_stack.dtype)
+    for x in range(matrix_shape[2]):
+        for i in range(4):
+            mueller_decomposition_matrix[:,:,i,x] = mueller_from_coherency_matrix(coherency_decomposition_matrix[:,:,i,x])
+    return mueller_decomposition_matrix
 
 def extract_elem_mm_stack(mueller_matrix_stack,index = [0,3]):
     '''
