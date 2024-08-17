@@ -11,7 +11,7 @@ Pyllama has been updated to allow for spectral dispersion and for modification o
 
 # Installation
 
-This repository is on PyPi and can be instaleld via 
+This repository is on PyPi and can be installed via 
 
 ```bash
 pip install berremueller
