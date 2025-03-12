@@ -9,6 +9,8 @@ import warnings
 
 '''Numeric and symbolic handling of Mueller matrices with some plotting functions
 
+(G&0) is Gil and Ossikovski, Polarized Light and the Mueller Matrix Approach, 2nd Ed.
+
 Andrew Salij'''
 
 def kron_vectorized(matrix_a,matrix_b):
@@ -1190,6 +1192,47 @@ def logm_mueller_matrix_stack(mueller_matrix_stack):
     for i in range(final_axis_size):#want to avoid this for loop but don't know how
         log_matrix_stack[:,:,i] = scipy.linalg.logm(np.real(mueller_matrix_intermediate_stack[:,:,i]))
     return np.reshape(log_matrix_stack,init_shape)
+
+
+def get_purity_components_mueller_matrix_stack(mueller_matrix_stack):
+    '''
+    provides arrays of the purity components of diattenuation, polarization, and birefringence of a Mueller matrix stack
+    See G&0 (6.1)
+    :param mueller_matrix_stack: np.ndarray (4,4,X)
+    :return: tuple(np.ndarray (X),np.ndarray (X), np.ndarray (X))
+    '''
+    normed_mueller_matrix_stack = norm_mueller_matrix_stack(mueller_matrix_stack)
+    purity_diattenuation_array = np.sqrt(normed_mueller_matrix_stack[0,1,:]**2+normed_mueller_matrix_stack[0,2,:]**2+normed_mueller_matrix_stack[0,3,:]**2)
+    purity_polarizance_array = np.sqrt(normed_mueller_matrix_stack[1,0,:]**2+normed_mueller_matrix_stack[2,0,:]**2+normed_mueller_matrix_stack[3,0,:]**2)
+    purity_birefringence_array = 1/np.sqrt(3)*np.sqrt(normed_mueller_matrix_stack[1,1,:]**2+normed_mueller_matrix_stack[2,2,:]**2+normed_mueller_matrix_stack[3,3,:]**2
+                                     +normed_mueller_matrix_stack[1,2,:]**2+normed_mueller_matrix_stack[1,3,:]**2+normed_mueller_matrix_stack[2,3,:]**2
+                                     +normed_mueller_matrix_stack[2,1,:]**2+normed_mueller_matrix_stack[3,1,:]**2+normed_mueller_matrix_stack[3,2,:]**2)
+    return purity_diattenuation_array,purity_polarizance_array,purity_birefringence_array
+
+def get_diattenuation_degree_components(mueller_matrix_stack):
+    '''
+    provides arrays of the purity components for the diattenuation of a Mueller matrix stack
+    See G&0 (6.23)
+    :param mueller_matrix_stack: np.ndarray (4,4,X)
+    :return: tuple(np.ndarray (X),np.ndarray (X))
+    '''
+    normed_mueller_matrix_stack = norm_mueller_matrix_stack(mueller_matrix_stack)
+    degree_linear_diattentuation_array = np.sqrt(normed_mueller_matrix_stack[0,1,:]**2+normed_mueller_matrix_stack[0,2,:]**2)
+    degree_circular_diattenuation_array = np.sqrt(normed_mueller_matrix_stack[0,3,:]**2)
+    return degree_linear_diattentuation_array,degree_circular_diattenuation_array
+
+def get_polarizance_degree_components(mueller_matrix_stack):
+    '''
+    provides arrays of the purity components for the polarizance of a Mueller matrix stack
+    See G&0 (6.24)
+    :param mueller_matrix_stack: np.ndarray (4,4,X)
+    :return: tuple(np.ndarray (X),np.ndarray (X))
+    '''
+    normed_mueller_matrix_stack = norm_mueller_matrix_stack(mueller_matrix_stack)
+    degree_linear_polarizance_array = np.sqrt(normed_mueller_matrix_stack[1,0,:]**2+normed_mueller_matrix_stack[2,-0,:]**2)
+    degree_circular_polarizance_array = np.sqrt(normed_mueller_matrix_stack[3,0,:]**2)
+    return degree_linear_polarizance_array,degree_circular_polarizance_array
+
 
 ## symbolic handling
 import sympy as sym

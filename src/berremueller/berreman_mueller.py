@@ -120,7 +120,7 @@ def reflection_transmission_from_intensity_matrices(reflection_matrix,transmissi
     return r_intensity, t_intensity
 
 def kron_vectorized(matrix_a,matrix_b):
-    mueller.kron_vectorized(matrix_a,matrix_b)
+    return mueller.kron_vectorized(matrix_a,matrix_b)
 
 def stokes_from_jones_vector(jones_vector):
     '''
